@@ -3,23 +3,23 @@ import re
 import openpyxl
 from openpyxl.utils.exceptions import IllegalCharacterError
 
-# Extract text from the DOC file using textract
+
 file_path = "sotr.doc"
 text = textract.process(file_path).decode('utf-8')
 
-# Print the first 2 lines of the extracted text
-print("\n".join(text.split("\n")[:2]))
 
-# Find all points with patterns a), b), etc., and include all text after it until the next one
+
+
+
 pattern = re.compile(r'\b([a-z])\) .+?(?=\n\s*\b[a-z]\) |\n\s*$)', re.DOTALL)
 matches = pattern.finditer(text)
 
-# Create a new Excel workbook and select the active worksheet
+
 wb = openpyxl.Workbook()
 ws = wb.active
 ws.title = "Extracted Points"
 
-# Write the matches to the Excel sheet
+
 ws.append(["Point", "Content"])
 for match in matches:
     try:
