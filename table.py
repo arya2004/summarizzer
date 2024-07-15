@@ -49,12 +49,13 @@ def store_in_excel(subpoints, output_file):
             full_text += "\n" + "\n".join(nested_subpoints)
         ws.cell(row=row, column=1, value=full_text)
         row += 1
+        print(row, full_text)
 
     wb.save(output_file)
 
 # Path to your DOC file
 file_path = 'sotr.doc'
-output_file = 'extracted_subpoints_v12.xlsx'
+output_file = 'extracted_subpoints_v13.xlsx'
 
 # Extract text
 try:
