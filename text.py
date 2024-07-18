@@ -1,8 +1,21 @@
 import textract
+from langchain_community.document_loaders import PyPDFDirectoryLoader 
+DATA_PATH = "./data/"
 
 def extract_text_from_doc(file_path):
     text = textract.process(file_path).decode('utf-8')
     return text
+
+def load_documents():
+    """
+    Load PDF documents from the specified directory using PyPDFDirectoryLoader.
+    Returns:
+    List of Document objects: Loaded PDF documents represented as Langchain Document objects.
+    """
+    # Initialize PDF loader with specified directory
+    document_loader = PyPDFDirectoryLoader(DATA_PATH)
+    # Load PDF documents and return them as a list of Document objects
+    return document_loader.load()
 
 import re
 
@@ -53,7 +66,7 @@ def query_system(query_text, model, index, chunks, top_k=5):
 
 
 # Step 1: Extract text from DOC file
-file_path = 'sotr.doc'
+file_path = 'bid.docx'
 text = extract_text_from_doc(file_path)
 
 # Step 2: Split text into chunks
@@ -66,7 +79,7 @@ embeddings = compute_embeddings(chunks)
 index = create_vector_database(embeddings)
 
 # Step 5: Query the system
-query_text = "What is Min life for bearings"
+query_text = "What is Tender No?"
 results = query_system(query_text, model, index, chunks)
 
 for result in results:
