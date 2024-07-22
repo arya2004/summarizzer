@@ -11,12 +11,20 @@ import ollama
 import logging
 from datetime import datetime
 
+# Configuration Variables
+DATA_PATH = "./data/"
+CHUNK_SIZE = 500
+MODEL_NAME = "BAAI/bge-large-en"
+TOP_K = 10
+EXCEL_FILE_PATH = 'extracted_points_1.xlsx'
+DOC_FILE_PATH = 'bid.docx'
+LOG_FILE_PREFIX = "debug_log_"
+LLM_MODEL = "mistral:latest"
+
 # Set up logging
 current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-log_file = f"debug_log_{current_time}.log"
+log_file = f"{LOG_FILE_PREFIX}{current_time}.log"
 logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(message)s')
-
-DATA_PATH = "./data/"
 
 def extract_text_from_doc(file_path):
     logging.debug(f"Extracting text from doc: {file_path}")
@@ -28,7 +36,7 @@ def load_documents():
     document_loader = PyPDFDirectoryLoader(DATA_PATH)
     return document_loader.load()
 
-def split_text_into_chunks(text, chunk_size=500):
+def split_text_into_chunks(text, chunk_size=CHUNK_SIZE):
     logging.debug("Splitting text into chunks")
     words = re.findall(r'\w+|\s+|[^\w\s]', text)
     chunks = []
@@ -49,7 +57,7 @@ def split_text_into_chunks(text, chunk_size=500):
     logging.debug(f"Total chunks created: {len(chunks)}")
     return chunks
 
-model = SentenceTransformer("BAAI/bge-large-en")
+model = SentenceTransformer(MODEL_NAME)
 logging.debug("SentenceTransformer model loaded")
 
 def compute_embeddings(chunks):
@@ -64,7 +72,7 @@ def create_vector_database(embeddings):
     index.add(embeddings)
     return index
 
-def query_system(query_text, model, index, chunks, top_k=10):
+def query_system(query_text, model, index, chunks, top_k=TOP_K):
     logging.debug(f"Querying system with text: {query_text}")
     query_embedding = model.encode([query_text])
     distances, indices = index.search(query_embedding, top_k)
@@ -74,21 +82,19 @@ def query_system(query_text, model, index, chunks, top_k=10):
 def classify_text_with_llm(query, context):
     logging.debug(f"Classifying text with LLM, query: {query}")
     prompt = f"Given the context: '{context}'\nIs the following query: '{query}' ACC or DEV? Respond with either 'ACC' or 'DEV'."
-    response = ollama.generate(model = "mistral:latest", prompt = prompt)
+    response = ollama.generate(model=LLM_MODEL, prompt=prompt)
     return response['response']
 
 # Main script
 logging.debug("Main script started")
-file_path_excel = 'extracted_points_1.xlsx'
-df = pd.read_excel(file_path_excel, sheet_name='Extracted Points')
+df = pd.read_excel(EXCEL_FILE_PATH, sheet_name='Extracted Points')
 
 if df.shape[1] < 3:
     df.insert(2, 'Result', '')
 if df.shape[1] < 4:
     df.insert(3, 'Classification', '')
 
-file_path_doc = 'bid.docx'
-text = extract_text_from_doc(file_path_doc)
+text = extract_text_from_doc(DOC_FILE_PATH)
 chunks = split_text_into_chunks(text)
 embeddings = compute_embeddings(chunks)
 index = create_vector_database(embeddings)
@@ -96,7 +102,7 @@ index = create_vector_database(embeddings)
 a = 0
 
 for i, query in enumerate(df.iloc[:, 1]):
-    if a < 83:
+    if a < 3:
         a += 1
         continue   
 
@@ -109,8 +115,8 @@ for i, query in enumerate(df.iloc[:, 1]):
     df.iloc[i, 3] = classification
     logging.debug(f"Classification for point {i+1}: {classification}")
     a += 1
-    if a == 86:
+    if a == 6:
         break
 
-df.to_excel(file_path_excel, sheet_name='Extracted Points', index=False)
+df.to_excel(EXCEL_FILE_PATH, sheet_name='Extracted Points', index=False)
 logging.debug("Processing complete. Results have been stored in the Excel file.")
