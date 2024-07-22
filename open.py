@@ -1,7 +1,8 @@
 from openai import OpenAI
 
 # Modify OpenAI's API key and API base to use vLLM's API server.
-
+openai_api_key = "dummty"
+openai_api_base = "dunmme"
 
 client = OpenAI(
     # defaults to os.environ.get("OPENAI_API_KEY")
