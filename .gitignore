@@ -169,3 +169,4 @@ cython_debug/
 chroma
 data
 config.py
+archive

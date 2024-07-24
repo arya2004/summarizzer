@@ -4,10 +4,10 @@ import pandas as pd
 from openpyxl import load_workbook
 import re
 from sentence_transformers import SentenceTransformer
+from keybert import KeyBERT
 import numpy as np
 import faiss
 import torch
-import ollama
 import logging
 from datetime import datetime
 
@@ -28,11 +28,6 @@ excel_file_path = config.EXCEL_FILE_PATH
 doc_file_path = config.DOC_FILE_PATH
 log_file_prefix = config.LOG_FILE_PREFIX
 llm_model = config.LLM_MODEL
-
-
-
-
-
 
 # Set up logging
 current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -73,32 +68,74 @@ def split_text_into_chunks(text, chunk_size=chunk_size):
 model = SentenceTransformer(model_name)
 logging.debug("SentenceTransformer model loaded")
 
+keybert_model = KeyBERT(model="intfloat/multilingual-e5-base")
+logging.debug("KeyBERT model loaded")
+
 def compute_embeddings(chunks):
     logging.debug(f"Computing embeddings for {len(chunks)} chunks")
     embeddings = model.encode(chunks)
     return embeddings
 
-def create_vector_database(embeddings):
+def extract_keywords(chunks):
+    logging.debug("Extracting keywords from chunks")
+    metadata = []
+    for chunk in chunks:
+        keywords = keybert_model.extract_keywords(chunk, keyphrase_ngram_range=(1, 2), stop_words='english')
+        metadata.append(keywords)
+    logging.debug(f"Extracted metadata for {len(chunks)} chunks")
+    return metadata
+
+def create_vector_database(embeddings, metadata):
     logging.debug("Creating vector database")
     d = embeddings.shape[1]
     index = faiss.IndexFlatL2(d)
     index.add(embeddings)
-    return index
+    return index, metadata
 
-def query_system(query_text, model, index, chunks, top_k=top_k):
+def optimize_query_with_llm(query_text):
+    logging.debug(f"Optimizing query text with LLM: {query_text}")
+
+    prompt = (
+        f"Optimize the following search query for better search results:\n\n"
+        f"Original Query: {query_text}\n\n"
+        f"Optimized Query:"
+    )
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Your task is to optimize the given search query for better search results."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            model=model_gpt,
+        )
+
+        optimized_query = chat_completion.choices[0].message.content.strip()
+        logging.debug(f"Optimized query: {optimized_query}")
+
+        return optimized_query
+    except Exception as e:
+        logging.error(f"Error during query optimization with LLM: {e}")
+        return query_text
+
+def query_system(query_text, model, index, chunks, metadata, top_k=top_k):
     logging.debug(f"Querying system with text: {query_text}")
     query_embedding = model.encode([query_text])
     distances, indices = index.search(query_embedding, top_k)
     results = [chunks[i] for i in indices[0]]
-    return results
-
+    result_metadata = [metadata[i] for i in indices[0]]
+    return results, result_metadata
 
 client = OpenAI(
-    # defaults to os.environ.get("OPENAI_API_KEY")
     api_key=openai_api_key,
     base_url=openai_api_base,
 )
-
 
 models = client.models.list()
 model_gpt = models.data[0].id
@@ -149,13 +186,18 @@ if df.shape[1] < 4:
 text = extract_text_from_doc(doc_file_path)
 chunks = split_text_into_chunks(text)
 embeddings = compute_embeddings(chunks)
-index = create_vector_database(embeddings)
+metadata = extract_keywords(chunks)
+index, metadata = create_vector_database(embeddings, metadata)
 
 a = 0
 
-for i, query in enumerate(df.iloc[:, 1]):  
+for i, query in enumerate(df.iloc[:, 1]):
+    # Optimize the query with LLM
+    optimized_query = optimize_query_with_llm(query)
+    logging.debug(f"Optimized query for point {i+1}: {optimized_query}")
 
-    results = query_system(query, model, index, chunks)
+    # Query the system with the optimized query
+    results, result_metadata = query_system(optimized_query, model, index, chunks, metadata)
     top_results = " | ".join(results)
     df.iloc[i, 2] = top_results
     
@@ -164,7 +206,7 @@ for i, query in enumerate(df.iloc[:, 1]):
     df.iloc[i, 3] = classification
     logging.debug(f"Classification for point {i+1}: {classification}")
     a += 1
-    if a > 20:
+    if a > 10:
         break
 
 df.to_excel(excel_file_path, sheet_name='Extracted Points', index=False)
