@@ -1,8 +1,8 @@
 from openai import OpenAI
-
+import config
 # Modify OpenAI's API key and API base to use vLLM's API server.
-openai_api_key = "dummty"
-openai_api_base = "dunmme"
+openai_api_key = config.OPENAI_API_KEY
+openai_api_base = config.OPENAI_API_BASE
 
 client = OpenAI(
     # defaults to os.environ.get("OPENAI_API_KEY")
@@ -16,19 +16,11 @@ model = models.data[0].id
 chat_completion = client.chat.completions.create(
     messages=[{
         "role": "system",
-        "content": "You are a helpful assistant."
+        "content": "you will always reply starting by a random number"
     }, {
         "role": "user",
-        "content": "Who won the world series in 2020?"
-    }, {
-        "role":
-        "assistant",
-        "content":
-        "The Los Angeles Dodgers won the World Series in 2020."
-    }, {
-        "role": "user",
-        "content": "What are go routines in Go? How are they different than Virtual threads in c#?"
-    }],
+        "content": "What are green threads? how different from virtual threads"
+    }, ],
     model=model,
 )
 
