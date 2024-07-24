@@ -165,8 +165,7 @@ cython_debug/
 
 *.txt
 *.doc*
-
+*.pdf
 chroma
-data
 config.py
 archive
